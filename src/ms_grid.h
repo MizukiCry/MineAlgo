@@ -70,7 +70,7 @@ namespace ms_algo {
             return state() == GridState::kFlaged;
         }
 
-        // Make a new grid.
+        // Makes a new grid.
         Grid(bool is_mine = false, int mine_count = 0, GridState state = GridState::kUnknown) {
             set_is_mine(is_mine);
             set_mine_count(mine_count);

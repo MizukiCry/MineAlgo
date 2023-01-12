@@ -5,12 +5,15 @@
 #include <cassert>
 #include <chrono>
 #include <random>
+#include <vector>
 
 namespace ms_algo {
+    using std::vector;
+
     template<class T>
-    std::vector<T>&& operator+(const std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>&& operator+(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
-        std::vector<T> result(lhs);
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] - rhs[i]);
         }
@@ -18,9 +21,9 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator-(const std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>&& operator-(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
-        std::vector<T> result(lhs);
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] - rhs[i]);
         }
@@ -28,9 +31,9 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator*(const std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>&& operator*(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
-        std::vector<T> result(lhs);
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] * rhs[i]);
         }
@@ -38,9 +41,9 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator/(const std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>&& operator/(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
-        std::vector<T> result(lhs);
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] / rhs[i]);
         }
@@ -48,32 +51,32 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>& operator+=(std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>& operator+=(vector<T>& lhs, const vector<T>& rhs) {
         lhs = std::move(lhs + rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator-=(std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>& operator-=(vector<T>& lhs, const vector<T>& rhs) {
         lhs = std::move(lhs - rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator*=(std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>& operator*=(vector<T>& lhs, const vector<T>& rhs) {
         lhs = std::move(lhs * rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator/=(std::vector<T>& lhs, const std::vector<T>& rhs) {
+    vector<T>& operator/=(vector<T>& lhs, const vector<T>& rhs) {
         lhs = std::move(lhs / rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>&& operator+(const std::vector<T>& lhs, const T& rhs) {
-        std::vector<T> result(lhs);
+    vector<T>&& operator+(const vector<T>& lhs, const T& rhs) {
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] + rhs[i]);
         }
@@ -81,8 +84,8 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator-(const std::vector<T>& lhs, const T& rhs) {
-        std::vector<T> result(lhs);
+    vector<T>&& operator-(const vector<T>& lhs, const T& rhs) {
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] - rhs[i]);
         }
@@ -90,8 +93,8 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator*(const std::vector<T>& lhs, const T& rhs) {
-        std::vector<T> result(lhs);
+    vector<T>&& operator*(const vector<T>& lhs, const T& rhs) {
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] * rhs[i]);
         }
@@ -99,8 +102,8 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>&& operator/(const std::vector<T>& lhs, const T& rhs) {
-        std::vector<T> result(lhs);
+    vector<T>&& operator/(const vector<T>& lhs, const T& rhs) {
+        vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
             result[i] = std::move(result[i] / rhs[i]);
         }
@@ -108,25 +111,25 @@ namespace ms_algo {
     }
 
     template<class T>
-    std::vector<T>& operator+=(std::vector<T>& lhs, const T& rhs) {
+    vector<T>& operator+=(vector<T>& lhs, const T& rhs) {
         lhs = std::move(lhs + rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator-=(std::vector<T>& lhs, const T& rhs) {
+    vector<T>& operator-=(vector<T>& lhs, const T& rhs) {
         lhs = std::move(lhs - rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator*=(std::vector<T>& lhs, const T& rhs) {
+    vector<T>& operator*=(vector<T>& lhs, const T& rhs) {
         lhs = std::move(lhs * rhs);
         return lhs;
     }
 
     template<class T>
-    std::vector<T>& operator/=(std::vector<T>& lhs, const T& rhs) {
+    vector<T>& operator/=(vector<T>& lhs, const T& rhs) {
         lhs = std::move(lhs / rhs);
         return lhs;
     }
@@ -153,7 +156,7 @@ namespace ms_algo {
     // Generates a random float in [l, r).
     double RandFloat(float l, float r) {
         assert(l < r);
-        return (double)ms_rand() / std::mt19937::max() / (r - l) + l;
+        return (double)ms_rand() / std::mt19937::max() * (r - l) + l;
     }
 
     int64_t GetMicroseconds() {

@@ -7,6 +7,8 @@
 #include "ms_lib.h"
 
 namespace ms_algo {
+    using std::vector;
+
     // The game board of minesweeper.
     class Board {
     private:
@@ -17,7 +19,7 @@ namespace ms_algo {
         int column_count_;
 
         // The game board.
-        std::vector<std::vector<Grid>> board_;
+        vector<vector<Grid>> board_;
 
     public:
         void Resize(const int row_count, const int column_count) {
@@ -39,11 +41,11 @@ namespace ms_algo {
             return column_count_;
         }
 
-        std::vector<std::vector<Grid>> board() const {
+        vector<vector<Grid>> board() const {
             return board_;
         }
 
-        std::vector<std::vector<Grid>>& board_ref() {
+        vector<vector<Grid>>& board_ref() {
             return board_;
         }
 
@@ -66,7 +68,7 @@ namespace ms_algo {
             board_[row][column] = grid;
         }
 
-        int count_mine(int row, int column) {
+        int CountMine(int row, int column) {
             assert(Inside(row, column));
             int result = 0;
             for (int i = 0; i < 8; ++i) {
@@ -78,6 +80,14 @@ namespace ms_algo {
             }
             get_grid_ref(row, column).set_mine_count(result);
             return result;
+        }
+
+        void Refresh() {
+            for (int row = 1; row <= row_count(); ++row) {
+                for (int column = 1; column <= column_count(); ++column) {
+                    CountMine(row, column);
+                }
+            }
         }
 
         void Open(int row, int column) {
