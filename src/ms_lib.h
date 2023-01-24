@@ -172,6 +172,17 @@ namespace ms_algo {
     double GetTime() {
         return (double)GetMicroseconds() * std::chrono::microseconds::period::num / std::chrono::microseconds::period::den;
     }
+
+    // Shuffles a vector.
+    template<class T>
+    void ShuffleVector(std::vector<T>& vec) {
+        std::shuffle(vec.begin(), vec.end(), ms_rand);
+    }
+
+    const int kMaxRowCount = 50;
+    const int kMaxColumnCount = 100;
+    const int kMaxThreadCount = 16;
+    const int kMaxTimeLimitMilliseconds = 60 * 1000;
 }
 
 #endif

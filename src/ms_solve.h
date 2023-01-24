@@ -8,7 +8,12 @@
 #include "ms_lib.h"
 
 namespace ms_algo {
+
     
+
+    bool Solvable(const Board& board) {
+        
+    }
 }
 
 #endif
