@@ -5,109 +5,114 @@
 #include <cassert>
 #include <chrono>
 #include <random>
+#include <thread>
+#include <utility>
 #include <vector>
 
 namespace ms_algo {
     using std::vector;
 
     template<class T>
-    vector<T>&& operator+(const vector<T>& lhs, const vector<T>& rhs) {
+    using Matrix = vector<vector<T>>;
+
+    template<class T>
+    vector<T> operator+(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] - rhs[i]);
+            result[i] = result[i] + rhs[i];
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator-(const vector<T>& lhs, const vector<T>& rhs) {
+    vector<T> operator-(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] - rhs[i]);
+            result[i] = result[i] - rhs[i];
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator*(const vector<T>& lhs, const vector<T>& rhs) {
+    vector<T> operator*(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] * rhs[i]);
+            result[i] = result[i] * rhs[i];
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator/(const vector<T>& lhs, const vector<T>& rhs) {
+    vector<T> operator/(const vector<T>& lhs, const vector<T>& rhs) {
         assert(lhs.size() == rhs.size());
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] / rhs[i]);
+            result[i] = result[i] / rhs[i];
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
     vector<T>& operator+=(vector<T>& lhs, const vector<T>& rhs) {
-        lhs = std::move(lhs + rhs);
+        lhs = lhs + rhs;
         return lhs;
     }
 
     template<class T>
     vector<T>& operator-=(vector<T>& lhs, const vector<T>& rhs) {
-        lhs = std::move(lhs - rhs);
+        lhs = lhs - rhs;
         return lhs;
     }
 
     template<class T>
     vector<T>& operator*=(vector<T>& lhs, const vector<T>& rhs) {
-        lhs = std::move(lhs * rhs);
+        lhs = lhs * rhs;
         return lhs;
     }
 
     template<class T>
     vector<T>& operator/=(vector<T>& lhs, const vector<T>& rhs) {
-        lhs = std::move(lhs / rhs);
+        lhs = lhs / rhs;
         return lhs;
     }
 
     template<class T>
-    vector<T>&& operator+(const vector<T>& lhs, const T& rhs) {
+    vector<T> operator+(const vector<T>& lhs, const T& rhs) {
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] + rhs[i]);
+            result[i] = result[i] + rhs;
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator-(const vector<T>& lhs, const T& rhs) {
+    vector<T> operator-(const vector<T>& lhs, const T& rhs) {
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] - rhs[i]);
+            result[i] = result[i] - rhs;
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator*(const vector<T>& lhs, const T& rhs) {
+    vector<T> operator*(const vector<T>& lhs, const T& rhs) {
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] * rhs[i]);
+            result[i] = result[i] * rhs;
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
-    vector<T>&& operator/(const vector<T>& lhs, const T& rhs) {
+    vector<T> operator/(const vector<T>& lhs, const T& rhs) {
         vector<T> result(lhs);
         for (size_t i = 0; i < lhs.size(); ++i) {
-            result[i] = std::move(result[i] / rhs[i]);
+            result[i] = result[i] / rhs;
         }
-        return std::move(result);
+        return result;
     }
 
     template<class T>
@@ -144,6 +149,22 @@ namespace ms_algo {
         return std::abs(lhs - rhs) < kEpsilon;
     }
 
+    bool Greater(double lhs, double rhs) {
+        return lhs - rhs > kEpsilon;
+    }
+
+    bool Less(double lhs, double rhs) {
+        return rhs - lhs > kEpsilon;
+    }
+
+    bool IsZero(double x) {
+        return std::abs(x) < kEpsilon;
+    }
+
+    bool NotZero(double x) {
+        return std::abs(x) > kEpsilon;
+    }
+
     std::chrono::steady_clock::time_point initial_clock = std::chrono::steady_clock::now();
     std::mt19937 ms_rand(initial_clock.time_since_epoch().count());
 
@@ -175,14 +196,18 @@ namespace ms_algo {
 
     // Shuffles a vector.
     template<class T>
-    void ShuffleVector(std::vector<T>& vec) {
+    void ShuffleVector(vector<T>& vec) {
         std::shuffle(vec.begin(), vec.end(), ms_rand);
     }
 
     const int kMaxRowCount = 50;
     const int kMaxColumnCount = 100;
-    const int kMaxThreadCount = 16;
+    const int kMaxThreadCount = std::clamp((int)std::thread::hardware_concurrency(), 8, 64);
     const int kMaxTimeLimitMilliseconds = 60 * 1000;
+
+    bool Inside(int row, int column, int row_count, int column_count) {
+        return 1 <= row && row <= row_count && 1 <= column && column <= column_count;
+    }
 }
 
 #endif

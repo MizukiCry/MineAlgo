@@ -6,8 +6,8 @@
 namespace ms_algo {
     // Describes the state of a grid.
     enum GridState {
-        kOpened,
         kUnknown,
+        kOpened,
         kFlaged,
     };
 

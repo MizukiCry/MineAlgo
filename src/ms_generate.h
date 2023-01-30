@@ -4,14 +4,13 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <functional>
 #include <future>
 #include <vector>
 
 #include "ms_board.h"
 
 namespace ms_algo {
-    using std::vector;
-
     enum RestrictionType {
         kUnrestricted,
         kIsMine,
@@ -28,7 +27,7 @@ namespace ms_algo {
         int row_count,
         int column_count,
         int randomize_mine_count,
-        vector<vector<RestrictionType>> restriction
+        Matrix<RestrictionType> restriction
     ) {
         Board result(row_count, column_count);
         vector<std::pair<int, int>> grids;
@@ -41,6 +40,8 @@ namespace ms_algo {
                 case RestrictionType::kIsMine:
                     randomize_mine_count -= 1;
                     result.get_grid_ref(row, column).set_is_mine();
+                    break;
+                default:
                     break;
                 }
             }
@@ -63,11 +64,44 @@ namespace ms_algo {
         int row_count,
         int column_count,
         int randomize_mine_count,
-        const vector<vector<RestrictionType>>& restriction,
+        const Board& initial_board,
+        vector<std::pair<int, int>> grids,
         std::atomic_bool& time_up
     ) {
+        while(!time_up) {
+            Board result(initial_board);
+            ShuffleVector(grids);
+            for (int i = 0; i < randomize_mine_count; ++i) {
+                auto [row, column] = grids[i];
+                result.get_grid_ref(row, column).set_is_mine();
+            }
+            result.Refresh();
+            if (Solvable(result, time_up)) {
+                time_up = true;
+                return {true, result};
+            }
+        }
+        return {};
+    }
+
+    // (Do not call this function directly) Calls TryGenerateSolvable() in multiple threads
+    std::pair<bool, Board> GenerateSolvable(
+        int row_count,
+        int column_count,
+        int time_limit_milliseconds,
+        int randomize_mine_count,
+        int thread_count,
+        Matrix<RestrictionType> restriction,
+        Matrix<GridState> gridstate
+    ) {
+        std::atomic_bool time_up = false;
+        std::future<void> time_thread = std::async(std::launch::async, [time_limit_milliseconds, &time_up] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_milliseconds));
+            time_up = true;
+        });
+
         Board initial_board(row_count, column_count);
-        std::vector<std::pair<int, int>> grids;
+        vector<std::pair<int, int>> grids;
         for (int row = 1; row <= row_count; ++row) {
             for (int column = 1; column <= column_count; ++column) {
                 switch (restriction[row][column])
@@ -78,45 +112,16 @@ namespace ms_algo {
                 case RestrictionType::kUnrestricted:
                     grids.emplace_back(row, column);
                     break;
+                default:
+                    break;
                 }
+                initial_board.get_grid_ref(row, column).set_state(gridstate[row][column]);
             }
         }
 
-        while(!time_up) {
-            Board result(initial_board);
-            ShuffleVector(grids);
-            for (int i = 0; i < randomize_mine_count; ++i) {
-                auto [row, column] = grids[i];
-                result.get_grid_ref(row, column).set_is_mine();
-            }
-            result.Refresh();
-            if (Solvable(result)) {
-                time_up = true;
-                return {true, result};
-            }
-        }
-        return {};
-    }
-
-    // (Do not call this function directly) Calls TryGenerateSolvable() int multiple threads
-    std::pair<bool, Board> GenerateSolvable(
-        int row_count,
-        int column_count,
-        int time_limit_milliseconds,
-        int randomize_mine_count,
-        int thread_count,
-        vector<vector<RestrictionType>> restriction
-    ) {
-        std::atomic_bool time_up = false;
-
-        std::async(std::launch::async, [time_limit_milliseconds, &time_up] {
-            std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_milliseconds));
-            time_up = true;
-        });
-
-        std::vector<std::future<std::pair<bool, Board>>> results(thread_count);
+        vector<std::future<std::pair<bool, Board>>> results(thread_count);
         for (auto &result: results) {
-            result = std::async(TryGenerateSolvable, row_count, column_count, randomize_mine_count, std::cref(restriction), std::ref(time_up));
+            result = std::async(TryGenerateSolvable, row_count, column_count, randomize_mine_count, std::cref(initial_board), grids, std::ref(time_up));
         }
 
         for (auto &result: results) {
@@ -131,6 +136,8 @@ namespace ms_algo {
         @brief Generates a game board according to the arguments.
         @param row_count The number of rows.
         @param column_count The number of columns.
+        @param restriction The restriction of the board, 'RestrictionType::kUnrestricted', 'RestrictionType::kIsMine' or 'RestrictionType::kNotMine'.
+        @param gridstate The state of the board, 'GridState::kUnknown', 'GridState::kOpened' or 'GridState::kFlaged'.
         @param type The type of board to be generated, completely random by `GenerateType::kNormal` and solvable without any guess by `GenerateType::kSolvable`.
         @param time_limit_milliseconds The time limitation, default by 1000 ms. (May not be accurate)
         @param randomize_mine_count The number of mines to be added into the board.
@@ -139,7 +146,8 @@ namespace ms_algo {
     std::pair<bool, Board> Generate(
         int row_count,
         int column_count,
-        vector<vector<RestrictionType>> restriction,
+        Matrix<RestrictionType> restriction,
+        Matrix<GridState> gridstate,
         GenerateType type = GenerateType::kNormal,
         int time_limit_milliseconds = 1000,
         int thread_count = 1,
@@ -169,7 +177,7 @@ namespace ms_algo {
         if (type == GenerateType::kNormal) {
             return GenerateNormal(row_count, column_count, randomize_mine_count, restriction);
         } else {
-            return GenerateSolvable(row_count, column_count, time_limit_milliseconds, randomize_mine_count, thread_count, restriction);
+            return GenerateSolvable(row_count, column_count, time_limit_milliseconds, randomize_mine_count, thread_count, restriction, gridstate);
         }
     }
 
@@ -177,11 +185,12 @@ namespace ms_algo {
         @brief Generates a game board according to the arguments.
         @param row_count The number of rows.
         @param column_count The number of columns.
-        @param type The type of board to be generated, completely random by `GenerateType::kNormal` and solvable without any guess by `GenerateType::kSolvable`.
-        @param time_limit_milliseconds The time limitation, default by 1000 ms. (May not be accurate)
-        @param randomize_mine_count The number of mines to be added into the board.
         @param start_row The row of the starting position guaranteed not to be mine. 0 means no limitation.
         @param start_column The column of the starting position guaranteed not to be mine. 0 means no limitation.
+        @param type The type of board to be generated, completely random by `GenerateType::kNormal` and solvable without any guess by `GenerateType::kSolvable`.
+        @param time_limit_milliseconds The time limitation, default by 1000 ms. (May not be accurate)
+        @param thread_count Enables multithreading by greater than 1.
+        @param randomize_mine_count The number of mines to be added into the board.
     */
     std::pair<bool, Board> Generate(
         int row_count,
@@ -195,11 +204,21 @@ namespace ms_algo {
     ) {
         assert(1 <= row_count && row_count <= kMaxRowCount);
         assert(1 <= column_count && column_count <= kMaxColumnCount);
+
+        if (start_row == 0) {
+            start_row = RandInteger(0, row_count) + 1;
+        }
+        if (start_column == 0) {
+            start_column = RandInteger(0, column_count) + 1;
+        }
+
         assert(1 <= start_row && start_row <= row_count);
         assert(1 <= start_column && start_column <= column_count);
-        vector<vector<RestrictionType>> restriction(row_count + 1, vector<RestrictionType>(column_count + 1, RestrictionType::kUnrestricted));
+        Matrix<RestrictionType> restriction(row_count + 1, vector<RestrictionType>(column_count + 1, RestrictionType::kUnrestricted));
+        Matrix<GridState> gridstate(row_count + 1, vector<GridState>(column_count + 1, GridState::kUnknown));
         restriction[start_row][start_column] = RestrictionType::kNotMine;
-        return Generate(row_count, column_count, restriction, type, time_limit_milliseconds, thread_count, randomize_mine_count);
+        gridstate[start_row][start_column] = GridState::kOpened;
+        return Generate(row_count, column_count, restriction, gridstate, type, time_limit_milliseconds, thread_count, randomize_mine_count);
     }
 }
 

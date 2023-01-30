@@ -1,6 +1,10 @@
 #ifndef MINEALGO_MS_BOARD_H_
 #define MINEALGO_MS_BOARD_H_
 
+#include <algorithm>
+#include <cassert>
+#include <iostream>
+#include <utility>
 #include <vector>
 
 #include "ms_grid.h"
@@ -19,9 +23,34 @@ namespace ms_algo {
         int column_count_;
 
         // The game board.
-        vector<vector<Grid>> board_;
+        Matrix<Grid> board_;
 
     public:
+        void Print() const {
+            std::cout << "Game Board: " << row_count() << " x " << column_count() << std::endl;
+            for (int row = 1; row <= row_count(); ++row) {
+                for (int column = 1; column <= column_count(); ++column) {
+                    Grid grid = get_grid(row, column);
+                    switch (grid.state())
+                    {
+                    case GridState::kUnknown:
+                        std::cout << '?';
+                        break;
+                    case GridState::kFlaged:
+                        std::cout << 'x';
+                        break;
+                    case GridState::kOpened:
+                        if (grid.mine_count() == 0) {
+                            std::cout << ' ';
+                        } else {
+                            std::cout << grid.mine_count();
+                        }
+                    }
+                }
+                std::cout << std::endl;
+            }
+        }
+
         void Resize(const int row_count, const int column_count) {
             assert(1 <= row_count && row_count <= 50);
             assert(1 <= column_count && column_count <= 100);
@@ -41,16 +70,16 @@ namespace ms_algo {
             return column_count_;
         }
 
-        vector<vector<Grid>> board() const {
+        Matrix<Grid> board() const {
             return board_;
         }
 
-        vector<vector<Grid>>& board_ref() {
+        Matrix<Grid>& board_ref() {
             return board_;
         }
 
         bool Inside(int row, int column) const {
-            return 1 <= row && row <= row_count() && 1 <= column && column <= column_count();
+            return ms_algo::Inside(row, column, row_count(), column_count());
         }
 
         Grid get_grid(int row, int column) const {
@@ -71,10 +100,10 @@ namespace ms_algo {
         int CountMine(int row, int column) {
             assert(Inside(row, column));
             int result = 0;
-            for (int i = 0; i < 8; ++i) {
-                int around_row = row + kRowOffset[i];
-                int around_column = column + kColumnOffset[i];
-                if (Inside(around_row, around_column) && get_grid(around_row, around_column).is_mine()) {
+            for (int index = 0; index < 8; ++index) {
+                int next_row = row + kRowOffset[index];
+                int next_column = column + kColumnOffset[index];
+                if (Inside(next_row, next_column) && get_grid(next_row, next_column).is_mine()) {
                     ++result;
                 }
             }
@@ -97,14 +126,52 @@ namespace ms_algo {
             assert(!current_grid.is_mine());
             current_grid.set_state(GridState::kOpened);
             if (current_grid.mine_count() == 0) {
-                for (int i = 0; i < 8; ++i) {
-                    int new_row = row + kRowOffset[i];
-                    int new_column = column + kColumnOffset[i];
-                    if (Inside(new_row, new_column) && get_grid(new_row, new_column).IsUnknown()) {
-                        Open(new_row, new_column);
+                for (int index = 0; index < 8; ++index) {
+                    int next_row = row + kRowOffset[index];
+                    int next_column = column + kColumnOffset[index];
+                    if (Inside(next_row, next_column) && get_grid(next_row, next_column).IsUnknown()) {
+                        Open(next_row, next_column);
                     }
                 }
             }
+        }
+
+        // Returns current situation of the board.
+        Matrix<std::pair<GridState, int>> GetSituation() const {
+            Matrix<std::pair<GridState, int>> situation(row_count() + 1, vector<std::pair<GridState, int>>(column_count() + 1));
+            for (int row = 1; row <= row_count(); ++row) {
+                for (int column = 1; column <= column_count(); ++column) {
+                    situation[row][column] = {get_grid(row, column).state(), get_grid(row, column).mine_count()};
+                }
+            }
+            return situation;
+        }
+
+        void SetSituation(Matrix<std::pair<GridState, int>>& situation) {
+            assert((int)situation.size() == row_count() + 1);
+            for (int row = 1; row <= row_count(); ++row) {
+                assert((int)situation[row].size() == column_count() + 1);
+                for (int column = 1; column <= column_count(); ++column) {
+                    if (get_grid(row, column).state() == GridState::kUnknown) {
+                        switch (situation[row][column].first)
+                        {
+                        case GridState::kFlaged:
+                            get_grid_ref(row, column).set_state(GridState::kFlaged);
+                            break;
+                        case GridState::kOpened:
+                            Open(row, column);
+                            break;
+                        default:
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        bool Solved() const {
+            assert(0);
+            return false;
         }
 
         Board(int row_count = 1, int column_count = 1) {
