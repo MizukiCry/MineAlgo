@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cassert>
+#include <future>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -211,6 +212,10 @@ namespace ms_algo {
     }
 
     bool SolveOneStep(int row_count, int column_count, Matrix<std::pair<GridState, int>>& states, std::atomic_bool& time_up) {
+        if (kPrintDebugInfo) {
+            std::cerr << "\nSolveOneStep" << std::endl;
+        }
+
         assert((int)states.size() == row_count + 1);
         for (int row = 1; row <= row_count; ++row) {
             assert((int)states[row].size() == column_count + 1);
@@ -255,11 +260,18 @@ namespace ms_algo {
     }
 
     bool Solvable(Board board, std::atomic_bool& time_up) {
+        if (kPrintDebugInfo) {
+            std::cerr << "\nSolvable?" << std::endl;
+            board.Print();
+            board.PrintAll();
+            std::cerr << std::endl;
+        }
+
         while (!time_up) {
             if (board.Solved()) {
                 return true;
             }
-            Matrix<std::pair<GridState, int>> situation(std::move(board.GetSituation()));
+            Matrix<std::pair<GridState, int>> situation(board.GetSituation());
             bool successed = SolveOneStep(board.row_count(), board.column_count(), situation, time_up);
             if (!successed) {
                 return false;
@@ -267,6 +279,15 @@ namespace ms_algo {
             board.SetSituation(situation);
         }
         return false;
+    }
+
+    bool Solvable(Board board, int time_limit_milliseconds = 1000) {
+        std::atomic_bool time_up = false;
+        std::future<void> time_thread = std::async(std::launch::async, [time_limit_milliseconds, &time_up] {
+            std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_milliseconds));
+            time_up = true;
+        });
+        return Solvable(board, time_up);
     }
 }
 

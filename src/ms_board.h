@@ -27,7 +27,7 @@ namespace ms_algo {
 
     public:
         void Print() const {
-            std::cout << "Game Board: " << row_count() << " x " << column_count() << std::endl;
+            std::cout << "Current Game Board: " << row_count() << " x " << column_count() << std::endl;
             for (int row = 1; row <= row_count(); ++row) {
                 for (int column = 1; column <= column_count(); ++column) {
                     Grid grid = get_grid(row, column);
@@ -41,10 +41,27 @@ namespace ms_algo {
                         break;
                     case GridState::kOpened:
                         if (grid.mine_count() == 0) {
-                            std::cout << ' ';
+                            std::cout << '.';
                         } else {
                             std::cout << grid.mine_count();
                         }
+                    }
+                }
+                std::cout << std::endl;
+            }
+        }
+
+        void PrintAll() const {
+            std::cout << "Actual Game Board: " << row_count() << " x " << column_count() << std::endl;
+            for (int row = 1; row <= row_count(); ++row) {
+                for (int column = 1; column <= column_count(); ++column) {
+                    Grid grid = get_grid(row, column);
+                    if (grid.is_mine()) {
+                        std::cout << '*';
+                    } else if (grid.mine_count() != 0) {
+                        std::cout << grid.mine_count();
+                    } else {
+                        std::cout << '.';
                     }
                 }
                 std::cout << std::endl;
@@ -57,7 +74,7 @@ namespace ms_algo {
             row_count_ = row_count;
             column_count_ = column_count;
             board_.resize(row_count + 1);
-            for (auto column: board_) {
+            for (auto& column: board_) {
                 column.resize(column_count + 1);
             }
         }
@@ -170,8 +187,14 @@ namespace ms_algo {
         }
 
         bool Solved() const {
-            assert(0);
-            return false;
+            for (int row = 1; row <= row_count(); ++row) {
+                for (int column = 1; column <= column_count(); ++column) {
+                    if (get_grid(row, column).state() == GridState::kUnknown) {
+                        return false;
+                    }
+                }
+            }
+            return true;
         }
 
         Board(int row_count = 1, int column_count = 1) {

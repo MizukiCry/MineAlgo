@@ -10,6 +10,8 @@
 #include <vector>
 
 namespace ms_algo {
+    const bool kPrintDebugInfo = true;
+
     using std::vector;
 
     template<class T>
