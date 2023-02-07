@@ -10,7 +10,7 @@
 #include <vector>
 
 namespace ms_algo {
-    const bool kPrintDebugInfo = true;
+    const bool kPrintDebugInfo = false;
 
     using std::vector;
 

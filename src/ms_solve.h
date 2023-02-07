@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cassert>
 #include <future>
+#include <iomanip>
 #include <iostream>
 #include <utility>
 #include <vector>
@@ -12,82 +13,147 @@
 #include "ms_board.h"
 #include "ms_grid.h"
 #include "ms_lib.h"
+#include "ms_timer.h"
 
 namespace ms_algo {
+    vector<std::pair<int, int>> GaussianElimination(Matrix<double>& matrix) {
+        if (kPrintDebugInfo) {
+            std::clog << "GaussianElimination:" << std::endl;
+            std::clog << "Before Gaussian:" << std::endl;
+            for (const auto& row: matrix) {
+                for (auto number: row) {
+                    std::clog << std::fixed << std::setprecision(0) << number << ' ';
+                }
+                std::clog << std::endl;
+            }
+        }
 
-    vector<int> GaussianElimination(Matrix<double>& matrix) {
-        vector<int> result;
-        for (size_t current = 0; current < matrix.size(); ++current) {
-            int max_row = current;
+        int unfree_variable_count = 0;
+        for (size_t current = 0; current < matrix[0].size(); ++current) {
+            int max_row = unfree_variable_count;
             for (size_t row = max_row + 1; row < matrix.size(); ++row) {
-                if (Greater(matrix[row][current], matrix[max_row][current])) {
+                if (Greater(std::abs(matrix[row][current]), std::abs(matrix[max_row][current]))) {
                     max_row = row;
                 }
             }
-            if ((int)current != max_row) {
-                std::swap(matrix[current], matrix[max_row]);
+
+            if (IsZero(matrix[max_row][current])) {
+                continue;
             }
 
-            for (size_t row = 0; row < matrix.size(); ++row) {
-                if (row != current && NotZero(matrix[row][current])) {
-                    matrix[row] -= matrix[current] * (matrix[current][current] / matrix[row][current]);
+            if (unfree_variable_count != max_row) {
+                std::swap(matrix[unfree_variable_count], matrix[max_row]);
+            }
+
+            for (int row = 0; row < (int)matrix.size(); ++row) {
+                if (row != unfree_variable_count && NotZero(matrix[row][current])) {
+                    matrix[row] -= matrix[unfree_variable_count] * (matrix[row][current] / matrix[unfree_variable_count][current]);
                 }
             }
+            matrix[unfree_variable_count] /= matrix[unfree_variable_count][current];
 
-            if (IsZero(matrix[current][current])) {
-                std::cerr << "Gaussian Elimination Error" << std::endl;
-                assert(false);
+            ++unfree_variable_count;
+            if (unfree_variable_count == (int)matrix.size()) {
+                break;
             }
-            matrix[current] /= matrix[current][current];
+        }
+        matrix.resize(unfree_variable_count);
 
-            bool solved = true;
-            for (size_t column = 0; column + 1 < matrix[current].size(); ++column) {
-                if (column != current && NotZero(matrix[current][column])) {
-                    solved = false;
-                    break;
+        if (kPrintDebugInfo) {
+            std::clog << "After Gaussian:" << std::endl;
+            for (const auto& row: matrix) {
+                for (auto number: row) {
+                    std::clog << std::fixed << std::setprecision(0) << number << ' ';
+                }
+                std::clog << std::endl;
+            }
+        }
+
+        vector<std::pair<int, int>> result;
+        for (const auto& row: matrix) {
+            int not_zero_position = -1;
+            for (size_t column = 0; column + 1 < row.size(); ++column) {
+                if (NotZero(row[column])) {
+                    if (not_zero_position == -1) {
+                        not_zero_position = column;
+                    } else {
+                        not_zero_position = -1;
+                        break;
+                    }
                 }
             }
-            if (solved) {
-                result.push_back(current);
+            if (not_zero_position != -1) {
+                if (IsZero(row.back())) {
+                    result.emplace_back(not_zero_position, 0);
+                } else if (Equal(row.back(), 1.0)) {
+                    result.emplace_back(not_zero_position, 1);
+                } else {
+                    std::cerr << "Gaussian Elimination Error." << std::endl;
+                    assert(false);
+                }
             }
         }
         return result;
     }
 
-    std::pair<int64_t, vector<int64_t>> EnumerateMine(const Matrix<double>& matrix, std::atomic_bool& time_up) {
+    std::pair<int64_t, vector<int64_t>> EnumerateMine(const Matrix<double>& matrix, Timer& timer) {
         int variable_count = (*matrix.begin()).size() - 1;
         int unfree_variable_count = matrix.size();
         int free_variable_count = variable_count - unfree_variable_count;
+
+        vector<int> free_variable_positions;
+        vector<int> unfree_variable_positions;
+        free_variable_positions.reserve(free_variable_count);
+        unfree_variable_positions.reserve(unfree_variable_count);
+        for (const auto& row: matrix) {
+            for (size_t column = 0; column + 1 < row.size(); ++column) {
+                if (NotZero(row[column])) {
+                    unfree_variable_positions.push_back(column);
+                    break;
+                }
+            }
+        }
+        for (int index = 0; index < variable_count; ++index) {
+            if (std::find(unfree_variable_positions.begin(), unfree_variable_positions.end(), index) == unfree_variable_positions.end()) {
+                free_variable_positions.push_back(index);
+            }
+        }
+
         int64_t legal_count = 0;
         vector<int64_t> count(variable_count, 0);
         for (int64_t situation = (1 << free_variable_count) - 1; situation >= 0; --situation) {
-            if (time_up) {
+            if (timer.TimeIsUp()) {
+                if (kPrintDebugInfo) {
+                    std::cerr << "EnumerateMine Timeout!" << std::endl;
+                }
                 return {};
             }
-            vector<double> unfree_variable(unfree_variable_count);
+            vector<double> unfree_variables;
+            unfree_variables.reserve(unfree_variable_count);
             bool illegal = false;
-            for (size_t current_variable = 0; current_variable < matrix.size(); ++current_variable) {
-                unfree_variable[current_variable] = matrix[current_variable].back();
+            for (int unfree_variable_index = 0; unfree_variable_index < unfree_variable_count; ++unfree_variable_index) {
+                double unfree_variable_value = matrix[unfree_variable_index].back();
                 for (int index = 0; index < free_variable_count; ++index) {
-                    unfree_variable[current_variable] -= (situation >> index & 1) * matrix[current_variable][unfree_variable_count + index];
+                    unfree_variable_value -= (situation >> index & 1) * matrix[unfree_variable_index][free_variable_positions[index]];
                 }
-                if (!Equal(unfree_variable[current_variable], 0.0) && !Equal(unfree_variable[current_variable], 1.0)) {
+                if (!Equal(unfree_variable_value, 0.0) && !Equal(unfree_variable_value, 1.0)) {
                     illegal = true;
                     break;
                 }
+                unfree_variables.push_back(unfree_variable_value);
             }
             if (illegal) {
                 continue;
             }
             ++legal_count;
-            for (int index = 0; index < unfree_variable_count; ++index) {
-                if (Equal(unfree_variable[index], 1.0)) {
-                    ++count[index];
-                }
-            }
             for (int index = 0; index < free_variable_count; ++index) {
                 if ((situation >> index & 1)) {
-                    ++count[unfree_variable_count + index];
+                    ++count[free_variable_positions[index]];
+                }
+            }
+            for (int index = 0; index < unfree_variable_count; ++index) {
+                if (Equal(unfree_variables[index], 1.0)) {
+                    ++count[unfree_variable_positions[index]];
                 }
             }
         }
@@ -203,44 +269,64 @@ namespace ms_algo {
                         }
                     }
                     *equation.rbegin() = mine_count;
-                    gauss_matrix.emplace_back(std::move(equation));
+                    gauss_matrix.emplace_back(equation);
                 }
-                result.emplace_back(std::move(unknown_positions), std::move(gauss_matrix));
+                result.emplace_back(unknown_positions, gauss_matrix);
             }
         }
         return result;
     }
 
-    bool SolveOneStep(int row_count, int column_count, Matrix<std::pair<GridState, int>>& states, std::atomic_bool& time_up) {
+    bool SolveOneStep(int row_count, int column_count, Matrix<std::pair<GridState, int>>& states, Timer& timer) {
         if (kPrintDebugInfo) {
-            std::cerr << "\nSolveOneStep" << std::endl;
+            std::clog << "\nSolveOneStep" << std::endl;
         }
 
         assert((int)states.size() == row_count + 1);
         for (int row = 1; row <= row_count; ++row) {
             assert((int)states[row].size() == column_count + 1);
         }
-        vector<Region> regions = std::move(Divide(row_count, column_count, states));
+        vector<Region> regions = Divide(row_count, column_count, states);
         ShuffleVector(regions);
+
+        if (kPrintDebugInfo) {
+            std::clog << "regions: " << regions.size() << 'x' << std::endl;
+
+            for (const auto& region: regions) {
+                std::clog << "region:\nPositions:";
+
+                for (auto [row, column]: region.first) {
+                    std::clog << " (" << row << ", " << column << ')';
+                }
+
+                std::clog << std::endl << "Matrix: " << region.second.size() << " x " << region.second[0].size() << std::endl;
+                for (const auto& row: region.second) {
+                    for (const auto& number: row) {
+                        std::clog << (int)number << ' ';
+                    }
+                    std::clog << std::endl;
+                }
+            }
+        }
+
         bool result = false;
         for (auto& region: regions) {
-            if (time_up) {
+            if (timer.TimeIsUp()) {
+                if (kPrintDebugInfo) {
+                    std::clog << "SolveOneStep Timeout!" << std::endl;
+                }
                 break;
             }
-            vector<int> solved = std::move(GaussianElimination(region.second));
+            vector<std::pair<int, int>> solved = GaussianElimination(region.second);
             if (!solved.empty()) {
-                for (int index: solved) {
+                for (auto [index, type]: solved) {
                     auto [row, column] = region.first[index];
-                    if (Equal(region.second[index].back(), 1.0)) {
-                        states[row][column].first = GridState::kFlaged;
-                    } else {
-                        states[row][column].first = GridState::kOpened;
-                    }
+                    states[row][column].first = type ? GridState::kFlaged : GridState::kOpened;
                 }
                 result = true;
                 continue;
             }
-            auto [legal_count, count] = EnumerateMine(region.second, time_up);
+            auto [legal_count, count] = EnumerateMine(region.second, timer);
             if (!legal_count) {
                 continue;
             }
@@ -259,35 +345,41 @@ namespace ms_algo {
         return result;
     }
 
-    bool Solvable(Board board, std::atomic_bool& time_up) {
+    bool Solvable(Board board, Timer& timer) {
         if (kPrintDebugInfo) {
-            std::cerr << "\nSolvable?" << std::endl;
+            std::clog << "\nSolvable?" << std::endl;
             board.Print();
             board.PrintAll();
-            std::cerr << std::endl;
+            std::clog << std::endl;
         }
 
-        while (!time_up) {
+        while (!timer.TimeIsUp()) {
             if (board.Solved()) {
+                if (kPrintDebugInfo) {
+                    std::clog << "Solved!" << std::endl;
+                }
                 return true;
             }
             Matrix<std::pair<GridState, int>> situation(board.GetSituation());
-            bool successed = SolveOneStep(board.row_count(), board.column_count(), situation, time_up);
+
+            if (kPrintDebugInfo) {
+                board.Print();
+            }
+            bool successed = SolveOneStep(board.row_count(), board.column_count(), situation, timer);
             if (!successed) {
                 return false;
             }
             board.SetSituation(situation);
         }
+        if (kPrintDebugInfo) {
+            std::clog << "Solvable Timeout!" << std::endl;
+        }
         return false;
     }
 
     bool Solvable(Board board, int time_limit_milliseconds = 1000) {
-        std::atomic_bool time_up = false;
-        std::future<void> time_thread = std::async(std::launch::async, [time_limit_milliseconds, &time_up] {
-            std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_milliseconds));
-            time_up = true;
-        });
-        return Solvable(board, time_up);
+        Timer timer(time_limit_milliseconds);
+        return Solvable(board, timer);
     }
 }
 

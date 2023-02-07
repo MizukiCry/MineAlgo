@@ -11,6 +11,7 @@
 
 #include "ms_board.h"
 #include "ms_solve.h"
+#include "ms_timer.h"
 
 namespace ms_algo {
     enum RestrictionType {
@@ -31,7 +32,10 @@ namespace ms_algo {
         int random_mine_count,
         Matrix<RestrictionType> restriction
     ) {
-        std::cerr << "GenerateNormal " << row_count << " x " << column_count << " : " << random_mine_count << std::endl;
+        if (kPrintDebugInfo) {
+            std::clog << "GenerateNormal " << row_count << " x " << column_count << " : " << random_mine_count << std::endl;
+        }
+
         Board result(row_count, column_count);
         vector<std::pair<int, int>> grids;
         for (int row = 1; row <= row_count; ++row) {
@@ -68,18 +72,18 @@ namespace ms_algo {
         int random_mine_count,
         const Board& initial_board,
         vector<std::pair<int, int>> grids,
-        std::atomic_bool& time_up
+        Timer& timer
     ) {
         if (kPrintDebugInfo) {
-            std::cerr << "TryGenerateSolvable: " << row_count << " x " << column_count << " : " << random_mine_count << std::endl;
-            std::cerr << "Grids: " << grids.size() << 'x' << std::endl;
+            std::clog << "TryGenerateSolvable: " << row_count << " x " << column_count << " : " << random_mine_count << std::endl;
+            std::clog << "Grids: " << grids.size() << 'x' << std::endl;
             for (auto [row, column]: grids) {
-                std::cerr << '(' << row << ", " << column << ") ";
+                std::clog << '(' << row << ", " << column << ") ";
             }
-            std::cerr << std::endl;
+            std::clog << std::endl;
         }
 
-        while(!time_up) {
+        while(!timer.TimeIsUp()) {
             Board result(initial_board);
             ShuffleVector(grids);
             for (int i = 0; i < random_mine_count; ++i) {
@@ -87,10 +91,13 @@ namespace ms_algo {
                 result.get_grid_ref(row, column).set_is_mine();
             }
             result.Refresh();
-            if (Solvable(result, time_up)) {
-                time_up = true;
+            if (Solvable(result, timer)) {
+                timer.Terminate();
                 return {true, result};
             }
+        }
+        if (kPrintDebugInfo) {
+            std::clog << "TryGenerateSolvable Timeout!" << std::endl;
         }
         return {};
     }
@@ -106,33 +113,29 @@ namespace ms_algo {
         Matrix<GridState> gridstate
     ) {
         if (kPrintDebugInfo) {
-            std::cerr << "GenerateSolvable: " << row_count << " x " << column_count << std::endl;
-            std::cerr << "TimeLimit: " << time_limit_milliseconds << "ms" << std::endl;
-            std::cerr << "RandomMine: " << random_mine_count << std::endl;
-            std::cerr << "Thread: " << thread_count << 'x' << std::endl;
+            std::clog << "GenerateSolvable: " << row_count << " x " << column_count << std::endl;
+            std::clog << "TimeLimit: " << time_limit_milliseconds << "ms" << std::endl;
+            std::clog << "RandomMine: " << random_mine_count << std::endl;
+            std::clog << "Thread: " << thread_count << 'x' << std::endl;
 
-            std::cerr << "\nRestriction: " << std::endl;
+            std::clog << "\nRestriction: " << std::endl;
             for (int row = 1; row <= row_count; ++row) {
                 for (int column = 1; column <= column_count; ++column) {
-                    std::cerr << restriction[row][column];
+                    std::clog << restriction[row][column];
                 }
-                std::cerr << std::endl;
+                std::clog << std::endl;
             }
 
-            std::cerr << "\nGridState: " << std::endl;
+            std::clog << "\nGridState: " << std::endl;
             for (int row = 1; row <= row_count; ++row) {
                 for (int column = 1; column <= column_count; ++column) {
-                    std::cerr << gridstate[row][column];
+                    std::clog << gridstate[row][column];
                 }
-                std::cerr << std::endl;
+                std::clog << std::endl;
             }
         }
 
-        std::atomic_bool time_up = false;
-        std::future<void> time_thread = std::async(std::launch::async, [time_limit_milliseconds, &time_up] {
-            std::this_thread::sleep_for(std::chrono::milliseconds(time_limit_milliseconds));
-            time_up = true;
-        });
+        Timer timer(time_limit_milliseconds);
 
         Board initial_board(row_count, column_count);
         vector<std::pair<int, int>> grids;
@@ -155,15 +158,19 @@ namespace ms_algo {
 
         vector<std::future<std::pair<bool, Board>>> results(thread_count);
         for (auto &result: results) {
-            result = std::async(TryGenerateSolvable, row_count, column_count, random_mine_count, std::cref(initial_board), grids, std::ref(time_up));
+            result = std::async(TryGenerateSolvable, row_count, column_count, random_mine_count, std::cref(initial_board), grids, std::ref(timer));
         }
 
         for (auto &result: results) {
-            if (result.get().first) {
-                return result.get();
+            auto [result_state, board] = result.get();
+            if (result_state) {
+                if (kPrintDebugInfo) {
+                    std::clog << "GenerateSolvable Succeed!" << std::endl;
+                }
+                return {true, board};
             }
         }
-        return {};
+        return {false, {}};
     }
 
     /**
@@ -208,7 +215,7 @@ namespace ms_algo {
             }
         }
         if (random_mine_count == 0) {
-            random_mine_count = std::min(row_count * column_count / 5, max_random_mine_count / 2);
+            random_mine_count = std::min(int(row_count * column_count * 0.15), max_random_mine_count / 4);
         }
         assert(0 <= random_mine_count && random_mine_count <= max_random_mine_count);
         if (type == GenerateType::kNormal) {

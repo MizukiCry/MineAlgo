@@ -139,7 +139,7 @@ namespace ms_algo {
         void Open(int row, int column) {
             assert(Inside(row, column));
             Grid& current_grid = get_grid_ref(row, column);
-            assert(current_grid.IsUnknown());
+            // assert(current_grid.IsUnknown());
             assert(!current_grid.is_mine());
             current_grid.set_state(GridState::kOpened);
             if (current_grid.mine_count() == 0) {

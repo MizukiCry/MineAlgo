@@ -11,7 +11,6 @@ Main functions:
 - ms_algo::Generate()
 - ms_algo::Solvable()
 - ms_algo::SolveOneStep()
-
 */
 
 int main() {
@@ -33,7 +32,7 @@ int main() {
 	std::cout << "\n--------------------\n" << std::endl;
 
 	{
-		auto [result, board] = ms_algo::Generate(5, 5, 2, 2, ms_algo::GenerateType::kSolvable, 1500, 1);
+		auto [result, board] = ms_algo::Generate(20, 20, 5, 5, ms_algo::GenerateType::kSolvable, 10000, 1);
 
 		if (!result) {
 			std::cout << "Failed" << std::endl;
@@ -41,8 +40,12 @@ int main() {
 		}
 		board.PrintAll();
 
-		board.Open(3, 3);
+		std::cout << "-----" << std::endl;
+		assert(ms_algo::Solvable(board));
 		board.Print();
+		board.Open(5, 5);
+		board.Print();
+		std::cout << "-----" << std::endl;
 		assert(ms_algo::Solvable(board));
 	}
 
